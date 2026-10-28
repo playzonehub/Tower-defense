@@ -1,0 +1,540 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Tower Defense - Crystal Kingdom</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#10152b;color:#fff;font-family:Arial,sans-serif;overflow-x:hidden}
+header{text-align:center;padding:12px 8px;background:linear-gradient(120deg,#713bda,#247ee8)}
+h1{margin:0;font-size:clamp(22px,5vw,32px)}
+header p{margin:5px 0 0;font-size:12px;color:#e8e9ff}
+.app{max-width:1000px;margin:auto;padding:10px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:9px}
+.stat{background:#202844;border:1px solid #34466d;border-radius:12px;text-align:center;padding:9px 2px}
+.stat span{display:block;font-size:11px;color:#b9c7ec;margin-bottom:4px}
+.stat b{font-size:clamp(16px,3.5vw,23px)}
+#gold{color:#ffd34e}#lives{color:#ff727c}#wave{color:#6be6ff}#score{color:#91f59b}
+.gamebox{position:relative;border:2px solid #455a83;border-radius:13px;overflow:hidden;background:#6abf68}
+canvas{display:block;width:100%;height:auto;touch-action:manipulation}
+#message{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:#111b31df;padding:8px 14px;border-radius:20px;font-size:12px;white-space:nowrap;pointer-events:none;text-align:center}
+#overlay{position:absolute;inset:0;background:#10152bdc;display:none;align-items:center;justify-content:center;text-align:center;padding:20px}
+#overlay .panel{background:#222e50;border:2px solid #647baf;border-radius:20px;padding:25px;max-width:320px;width:100%}
+#overlay h2{font-size:30px;margin:0 0 8px}
+button{border:0;border-radius:10px;padding:11px 12px;font-weight:bold;font-size:13px;cursor:pointer;touch-action:manipulation;color:white;background:#40547b}
+button:active{transform:scale(.97)}
+button:disabled{opacity:.38}
+.controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:10px}
+.towerbtn{min-height:75px;background:#202844;border:2px solid #3d4d70;padding:7px 3px}
+.towerbtn.selected{border-color:#ffe06b;background:#35405f;box-shadow:0 0 12px #ffe06b55}
+.towerbtn .emoji{font-size:24px;display:block;margin-bottom:5px}
+.towerbtn small{display:block;color:#c3cbea;font-size:10px;margin-top:3px}
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}
+#startBtn{background:#21a66c}#upgradeBtn{background:#8a54dc}#sellBtn{background:#d65a68}
+#soundBtn{background:#344b77}
+.info{background:#202844;border-radius:12px;padding:12px;margin-top:10px;font-size:12px;line-height:1.65;color:#d2dcf5}
+.info strong{color:#ffe079}
+@media(max-width:420px){
+.app{padding:7px}.stat{padding:7px 1px}.controls{gap:4px}.towerbtn{font-size:11px}.actions{gap:5px}.actions button{padding:10px 3px;font-size:11px}
+}
+</style>
+</head>
+<body>
+<header>
+<h1>🏰 Crystal Kingdom</h1>
+<p>Build towers • Defend the path • Survive the waves!</p>
+</header>
+
+<div class="app">
+  <div class="stats">
+    <div class="stat"><span>💰 COINS</span><b id="gold">180</b></div>
+    <div class="stat"><span>❤️ LIVES</span><b id="lives">20</b></div>
+    <div class="stat"><span>🌊 WAVE</span><b id="wave">0</b></div>
+    <div class="stat"><span>⭐ SCORE</span><b id="score">0</b></div>
+  </div>
+
+  <div class="gamebox">
+    <canvas id="game" width="800" height="500"></canvas>
+    <div id="message">Choose a tower, then tap the grass to build!</div>
+    <div id="overlay">
+      <div class="panel">
+        <h2 id="overTitle">Game Over!</h2>
+        <p id="overText">Your kingdom needs you!</p>
+        <button id="restartOver" style="background:#21a66c;width:100%;font-size:16px">🔄 Play Again</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="towerbtn selected" data-type="archer">
+      <span class="emoji">🏹</span>Archer
+      <small>💰 50 · Fast</small>
+    </button>
+    <button class="towerbtn" data-type="cannon">
+      <span class="emoji">💣</span>Cannon
+      <small>💰 85 · Splash</small>
+    </button>
+    <button class="towerbtn" data-type="ice">
+      <span class="emoji">❄️</span>Frost
+      <small>💰 70 · Slow</small>
+    </button>
+    <button class="towerbtn" data-type="magic">
+      <span class="emoji">🔮</span>Magic
+      <small>💰 110 · Strong</small>
+    </button>
+  </div>
+
+  <div class="actions">
+    <button id="startBtn">▶ Start Wave</button>
+    <button id="upgradeBtn">⬆ Upgrade</button>
+    <button id="sellBtn">💰 Sell Tower</button>
+  </div>
+  <div class="actions">
+    <button id="soundBtn">🔊 Sound: ON</button>
+    <button id="restartBtn">🔄 Restart</button>
+    <button id="clearBtn">✖ Deselect</button>
+  </div>
+
+  <div class="info">
+    <strong>🎮 How to play</strong><br>
+    1. Choose a tower, then tap an empty grass area to place it.<br>
+    2. Tap a tower on the map to select it. Use <strong>Upgrade</strong> to increase its power and range.<br>
+    3. Press <strong>Start Wave</strong> to send enemies down the path. Towers attack automatically.<br>
+    4. Earn coins for defeating enemies. If your lives reach zero, the game ends.<br>
+    <strong>Tip:</strong> Place towers near corners so they can attack enemies for longer.
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const W = canvas.width, H = canvas.height;
+
+const $ = id => document.getElementById(id);
+const ui = {
+  gold: $("gold"), lives: $("lives"), wave: $("wave"), score: $("score"),
+  message: $("message"), overlay: $("overlay"),
+  overTitle: $("overTitle"), overText: $("overText"),
+  start: $("startBtn"), upgrade: $("upgradeBtn"), sell: $("sellBtn"),
+  sound: $("soundBtn")
+};
+
+const PATH = [
+  {x:0,y:115},{x:150,y:115},{x:150,y:285},
+  {x:330,y:285},{x:330,y:105},{x:510,y:105},
+  {x:510,y:365},{x:680,y:365},{x:680,y:215},{x:800,y:215}
+];
+
+const TYPES = {
+  archer:{name:"Archer",cost:50,damage:14,range:125,rate:.55,speed:390,color:"#ffe07a",radius:5},
+  cannon:{name:"Cannon",cost:85,damage:32,range:105,rate:1.25,speed:255,color:"#ff845d",radius:9,splash:43},
+  ice:{name:"Frost",cost:70,damage:7,range:115,rate:.8,speed:330,color:"#7de8ff",radius:6,slow:.55},
+  magic:{name:"Magic",cost:110,damage:38,range:145,rate:1.0,speed:350,color:"#dc9cff",radius:7}
+};
+
+let gold, lives, wave, score, towers, enemies, shots, particles;
+let selectedType = "archer";
+let selectedTower = null;
+let waveActive = false, waveQueue = 0, spawnTimer = 0;
+let gameOver = false, soundOn = true, lastTime = 0;
+let audioCtx = null, time = 0;
+
+function reset() {
+  gold = 180; lives = 20; wave = 0; score = 0;
+  towers = []; enemies = []; shots = []; particles = [];
+  selectedTower = null; selectedType = "archer";
+  waveActive = false; waveQueue = 0; spawnTimer = 0;
+  gameOver = false; time = 0;
+  ui.overlay.style.display = "none";
+  ui.message.textContent = "Choose a tower, then tap the grass to build!";
+  document.querySelectorAll(".towerbtn").forEach(b =>
+    b.classList.toggle("selected", b.dataset.type === selectedType)
+  );
+  updateUI();
+}
+
+function updateUI() {
+  ui.gold.textContent = gold;
+  ui.lives.textContent = lives;
+  ui.wave.textContent = wave;
+  ui.score.textContent = score;
+  ui.upgrade.disabled = !selectedTower || selectedTower.level >= 4 || gameOver;
+  ui.sell.disabled = !selectedTower || gameOver;
+  ui.start.disabled = waveActive || gameOver;
+  ui.start.textContent = waveActive ? "⚔ Wave Running" : "▶ Start Wave";
+}
+
+function playSound(freq=500, duration=.07, type="sine") {
+  if (!soundOn) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(.06, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime + duration);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + duration);
+  } catch(e) {}
+}
+
+function dist(a,b) { return Math.hypot(a.x-b.x,a.y-b.y); }
+function pathLength() {
+  let n=0;
+  for(let i=1;i<PATH.length;i++) n+=dist(PATH[i-1],PATH[i]);
+  return n;
+}
+const TOTAL_PATH = pathLength();
+
+function pointAt(progress) {
+  let d = progress;
+  for(let i=1;i<PATH.length;i++) {
+    const a=PATH[i-1], b=PATH[i], len=dist(a,b);
+    if(d<=len) {
+      const t=len ? d/len : 0;
+      return {x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t};
+    }
+    d-=len;
+  }
+  return {...PATH[PATH.length-1]};
+}
+
+function isOnPath(x,y) {
+  for(let i=1;i<PATH.length;i++) {
+    const a=PATH[i-1], b=PATH[i];
+    const dx=b.x-a.x, dy=b.y-a.y;
+    const len2=dx*dx+dy*dy;
+    const t=Math.max(0,Math.min(1,((x-a.x)*dx+(y-a.y)*dy)/(len2||1)));
+    const px=a.x+t*dx, py=a.y+t*dy;
+    if(Math.hypot(x-px,y-py)<32) return true;
+  }
+  return false;
+}
+
+function canBuild(x,y) {
+  if(x<25||x>775||y<25||y>475||isOnPath(x,y)) return false;
+  return !towers.some(t=>dist(t,{x,y})<35);
+}
+
+function setMessage(msg) { ui.message.textContent=msg; }
+
+function buildTower(x,y) {
+  const spec=TYPES[selectedType];
+  if(gold<spec.cost) {
+    setMessage("Not enough coins! Defeat enemies to earn more.");
+    playSound(160,.12,"square"); return;
+  }
+  if(!canBuild(x,y)) {
+    setMessage("Build on empty grass, away from the path and other towers.");
+    return;
+  }
+  gold-=spec.cost;
+  const t={x,y,type:selectedType,level:1,cooldown:0,spent:spec.cost,angle:0};
+  towers.push(t); selectedTower=t;
+  playSound(650,.09);
+  setMessage(spec.name+" tower built! Tap another tower to select it.");
+  updateUI();
+}
+
+function upgradeTower() {
+  if(!selectedTower||selectedTower.level>=4||gameOver) return;
+  const t=selectedTower;
+  const cost=Math.round(TYPES[t.type].cost*(.65+t.level*.45));
+  if(gold<cost) {
+    setMessage("Need "+cost+" coins for this upgrade.");
+    playSound(160,.12,"square"); return;
+  }
+  gold-=cost; t.spent+=cost; t.level++;
+  playSound(780,.12);
+  setMessage(TYPES[t.type].name+" upgraded to level "+t.level+"!");
+  updateUI();
+}
+
+function sellTower() {
+  if(!selectedTower||gameOver) return;
+  const t=selectedTower;
+  const refund=Math.floor(t.spent*.65);
+  gold+=refund;
+  towers=towers.filter(a=>a!==t);
+  selectedTower=null;
+  setMessage("Tower sold for "+refund+" coins.");
+  playSound(350,.08);
+  updateUI();
+}
+
+function startWave() {
+  if(waveActive||gameOver) return;
+  wave++;
+  waveQueue=6+wave*2;
+  spawnTimer=.2;
+  waveActive=true;
+  setMessage("Wave "+wave+" incoming! Defend your kingdom!");
+  playSound(520,.13);
+  updateUI();
+}
+
+function spawnEnemy() {
+  const boss = wave%5===0 && waveQueue===1;
+  const hp = (22+wave*9)*(boss?5:1);
+  enemies.push({
+    progress:0,
+    hp,maxHp:hp,
+    speed:(boss?31:42+Math.min(wave*1.7,28)),
+    reward:boss?35:8+Math.floor(wave/3),
+    radius:boss?17:10+Math.min(wave*.2,3),
+    slowTimer:0, slowFactor:1, boss
+  });
+  waveQueue--;
+}
+
+function burst(x,y,color,count=8) {
+  for(let i=0;i<count;i++) {
+    const a=Math.random()*Math.PI*2, speed=25+Math.random()*100;
+    particles.push({x,y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,
+      life:.3+Math.random()*.4,maxLife:.7,color,size:2+Math.random()*3});
+  }
+}
+
+function fire(t,e) {
+  const s=TYPES[t.type];
+  const mult=1+(t.level-1)*.55;
+  shots.push({
+    x:t.x,y:t.y-5,target:e,damage:s.damage*mult,
+    speed:s.speed,type:t.type,color:s.color,radius:s.radius,
+    splash:s.splash||0,slow:s.slow||0
+  });
+  t.cooldown=s.rate*(1-(t.level-1)*.09);
+  playSound(t.type==="cannon"?170:t.type==="magic"?700:440,.035,
+    t.type==="cannon"?"triangle":"sine");
+}
+
+function damageEnemy(e,damage,slow=0) {
+  e.hp-=damage;
+  if(slow>0) {e.slowTimer=1.8;e.slowFactor=slow;}
+  burst(e.x,e.y,slow>0?"#8deaff":"#ffe29a",3);
+  if(e.hp<=0) {
+    gold+=e.reward; score+=10+(wave*2);
+    burst(e.x,e.y,e.boss?"#ff7b9e":"#ffe66d",e.boss?20:9);
+    enemies=enemies.filter(a=>a!==e);
+    playSound(e.boss?900:600,.08);
+  }
+}
+
+function update(dt) {
+  if(gameOver) return;
+  time+=dt;
+
+  if(waveActive) {
+    spawnTimer-=dt;
+    if(waveQueue>0&&spawnTimer<=0) {
+      spawnEnemy();
+      spawnTimer=Math.max(.42,.95-wave*.025);
+    }
+    if(waveQueue<=0&&enemies.length===0) {
+      waveActive=false;
+      gold+=12+wave*2;
+      setMessage("Wave "+wave+" cleared! Bonus coins awarded. Start the next wave!");
+      playSound(880,.18);
+    }
+  }
+
+  for(const e of enemies) {
+    if(e.slowTimer>0)e.slowTimer-=dt;
+    const speed=e.speed*(e.slowTimer>0?e.slowFactor:1);
+    e.progress+=speed*dt;
+    const p=pointAt(e.progress); e.x=p.x;e.y=p.y;
+  }
+  const escaped=enemies.filter(e=>e.progress>=TOTAL_PATH);
+  if(escaped.length) {
+    for(const e of escaped) {
+      lives-=e.boss?3:1;
+      burst(e.x,e.y,"#ff5252",8);
+    }
+    enemies=enemies.filter(e=>e.progress<TOTAL_PATH);
+    playSound(120,.2,"sawtooth");
+    setMessage("Enemies escaped! Protect your kingdom!");
+    if(lives<=0) {
+      lives=0; gameOver=true;
+      ui.overTitle.textContent="💔 Kingdom Fallen!";
+      ui.overText.textContent="You reached wave "+wave+" and scored "+score+" points.";
+      ui.overlay.style.display="flex";
+    }
+  }
+
+  for(const t of towers) {
+    t.cooldown-=dt;
+    const spec=TYPES[t.type];
+    let target=null, best=-1;
+    for(const e of enemies) {
+      if(e.hp<=0) continue;
+      const d=dist(t,e);
+      if(d<=spec.range && e.progress>best) {target=e;best=e.progress;}
+    }
+    if(target) {
+      t.angle=Math.atan2(target.y-t.y,target.x-t.x);
+      if(t.cooldown<=0) fire(t,target);
+    }
+  }
+
+  for(const s of shots) {
+    if(!s.target||!enemies.includes(s.target)) {s.dead=true;continue;}
+    const e=s.target, d=dist(s,e), step=s.speed*dt;
+    if(d<=step+e.radius) {
+      if(s.splash>0) {
+        for(const near of [...enemies]) {
+          if(dist(near,e)<=s.splash) damageEnemy(near,s.damage,0);
+        }
+      } else damageEnemy(e,s.damage,s.slow);
+      burst(e.x,e.y,s.color,5); s.dead=true;
+    } else {
+      s.x+=(e.x-s.x)/d*step; s.y+=(e.y-s.y)/d*step;
+    }
+  }
+  shots=shots.filter(s=>!s.dead);
+
+  for(const p of particles) {
+    p.x+=p.vx*dt;p.y+=p.vy*dt;
+    p.vx*=Math.pow(.1,dt);p.vy*=Math.pow(.1,dt);
+    p.life-=dt;
+  }
+  particles=particles.filter(p=>p.life>0);
+  updateUI();
+}
+
+function drawBackground() {
+  ctx.fillStyle="#7dcf72";ctx.fillRect(0,0,W,H);
+  // Grass tiles
+  for(let y=0;y<H;y+=40)for(let x=0;x<W;x+=40) {
+    if(((x/40+y/40)%2)===0) {
+      ctx.fillStyle="#74c96b";ctx.fillRect(x,y,40,40);
+    }
+  }
+  // Decorative flowers
+  for(let i=0;i<36;i++) {
+    const x=(i*137+37)%W, y=(i*83+25)%H;
+    if(!isOnPath(x,y)) {
+      ctx.fillStyle=i%2?"#fff2a8":"#ffbde2";
+      ctx.beginPath();ctx.arc(x,y,2.3,0,Math.PI*2);ctx.fill();
+    }
+  }
+  // Path base and stone edging
+  ctx.lineCap="round";ctx.lineJoin="round";
+  ctx.beginPath();PATH.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+  ctx.strokeStyle="#8a6847";ctx.lineWidth=65;ctx.stroke();
+  ctx.strokeStyle="#d7bb8c";ctx.lineWidth=57;ctx.stroke();
+  ctx.strokeStyle="#c7a879";ctx.lineWidth=2;ctx.setLineDash([8,10]);ctx.stroke();
+  ctx.setLineDash([]);
+  // Start and finish
+  ctx.fillStyle="#ffffff";ctx.font="bold 14px Arial";
+  ctx.fillText("START",8,77);
+  ctx.font="22px Arial";ctx.fillText("🏰",746,190);
+  // Water pond
+  ctx.fillStyle="#56bce2";ctx.beginPath();ctx.ellipse(738,80,34,20,-.2,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle="#a3edff";ctx.lineWidth=3;ctx.stroke();
+  ctx.fillStyle="#fff";ctx.font="10px Arial";ctx.fillText("POND",724,84);
+}
+
+function drawTower(t) {
+  const s=TYPES[t.type];
+  if(selectedTower===t) {
+    ctx.beginPath();ctx.arc(t.x,t.y,s.range,0,Math.PI*2);
+    ctx.fillStyle="#ffffff18";ctx.fill();
+    ctx.strokeStyle="#ffffffaa";ctx.lineWidth=1.5;ctx.setLineDash([5,5]);ctx.stroke();ctx.setLineDash([]);
+  }
+  // Base shadow and base
+  ctx.fillStyle="#29465355";ctx.beginPath();ctx.ellipse(t.x+2,t.y+8,20,12,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#526d86";ctx.beginPath();ctx.arc(t.x,t.y,18,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle="#d5e5f8";ctx.lineWidth=2;ctx.stroke();
+  // Tower type symbol
+  ctx.save();ctx.translate(t.x,t.y);ctx.rotate(t.angle||0);
+  ctx.fillStyle=s.color;
+  if(t.type==="archer") {
+    ctx.fillRect(-4,-4,19,8);
+    ctx.fillStyle="#784b30";ctx.beginPath();ctx.arc(-1,0,10,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle="#ffe6b1";ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,10,-1.1,1.1);ctx.stroke();
+    ctx.strokeStyle="#ffffff";ctx.beginPath();ctx.moveTo(-2,0);ctx.lineTo(15,0);ctx.stroke();
+  } else if(t.type==="cannon") {
+    ctx.fillStyle="#ed7857";ctx.beginPath();ctx.arc(0,0,11,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#43485d";ctx.fillRect(0,-6,18,12);
+    ctx.fillStyle="#f8bc7a";ctx.beginPath();ctx.arc(-2,0,4,0,Math.PI*2);ctx.fill();
+  } else if(t.type==="ice") {
+    ctx.fillStyle="#5de2ff";ctx.beginPath();
+    for(let i=0;i<6;i++){const a=i*Math.PI/3-Math.PI/2;const x=Math.cos(a)*12,y=Math.sin(a)*12;i?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+    ctx.closePath();ctx.fill();ctx.strokeStyle="#fff";ctx.stroke();
+  } else {
+    ctx.fillStyle="#b77aff";ctx.beginPath();ctx.arc(0,0,12,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#fff0a1";ctx.beginPath();ctx.arc(0,0,6,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#7b48ce";ctx.fillRect(3,-5,15,10);
+  }
+  ctx.restore();
+  // Level marker
+  ctx.fillStyle="#19213a";ctx.beginPath();ctx.arc(t.x+14,t.y-15,8,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#ffe87b";ctx.font="bold 10px Arial";ctx.textAlign="center";
+  ctx.fillText(t.level,t.x+14,t.y-11);ctx.textAlign="left";
+}
+
+function drawEnemy(e) {
+  ctx.save();ctx.translate(e.x,e.y);
+  // shadow
+  ctx.fillStyle="#213d3b55";ctx.beginPath();ctx.ellipse(2,e.radius+4,e.radius+3,5,0,0,Math.PI*2);ctx.fill();
+  if(e.boss) {
+    ctx.fillStyle="#7b254e";ctx.beginPath();ctx.arc(0,0,e.radius,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#ff8bb8";
+    ctx.beginPath();ctx.moveTo(-10,-10);ctx.lineTo(-15,-23);ctx.lineTo(-3,-15);ctx.fill();
+    ctx.beginPath();ctx.moveTo(10,-10);ctx.lineTo(15,-23);ctx.lineTo(3,-15);ctx.fill();
+  } else {
+    ctx.fillStyle=e.slowTimer>0?"#55bfea":(wave%3===0?"#a04bce":"#df5c69");
+    ctx.beginPath();ctx.arc(0,0,e.radius,0,Math.PI*2);ctx.fill();
+  }
+  // eyes
+  ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(-4,-2,3,0,Math.PI*2);ctx.arc(4,-2,3,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#222";ctx.beginPath();ctx.arc(-3,-2,1.5,0,Math.PI*2);ctx.arc(5,-2,1.5,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+  // health bar
+  const bw=e.boss?40:26, bh=4;
+  ctx.fillStyle="#5b2332";ctx.fillRect(e.x-bw/2,e.y-e.radius-10,bw,bh);
+  ctx.fillStyle=e.hp/e.maxHp>.5?"#69f28c":"#ff5269";
+  ctx.fillRect(e.x-bw/2,e.y-e.radius-10,bw*Math.max(0,e.hp/e.maxHp),bh);
+}
+
+function draw() {
+  drawBackground();
+  // placement preview
+  if(!gameOver && !selectedTower && selectedType) {
+    // preview shown at pointer separately
+  }
+  for(const t of towers)drawTower(t);
+  for(const e of enemies)drawEnemy(e);
+  for(const s of shots) {
+    ctx.fillStyle=s.color;ctx.beginPath();ctx.arc(s.x,s.y,s.radius,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#ffffff99";ctx.beginPath();ctx.arc(s.x-1,s.y-1,Math.max(1,s.radius/2),0,Math.PI*2);ctx.fill();
+  }
+  for(const p of particles) {
+    ctx.globalAlpha=Math.max(0,p.life/p.maxLife);
+    ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  // little status tag
+  ctx.fillStyle="#17223acb";ctx.beginPath();ctx.roundRect(10,10,145,25,8);ctx.fill();
+  ctx.fillStyle="#fff";ctx.font="bold 11px Arial";
+  ctx.fillText(waveActive?"⚔ DEFEND THE KINGDOM":"🛡 READY TO DEFEND",19,26);
+}
+
+function canvasPos(event) {
+  const r=canvas.getBoundingClientRect();
+  return {x:(event.clientX-r.left)*W/r.width,y:(event.clientY-r.top)*H/r.height};
+}
+
+canvas.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  if(gameOver)return;
+  const p=canvasPos(e);
+  // Select an existing tower first
+  const found=[...towers].reverse().find(
